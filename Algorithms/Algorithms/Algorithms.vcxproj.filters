@@ -25,6 +25,9 @@
     <Filter Include="Header Files\Graphs">
       <UniqueIdentifier>{3b0461a5-9817-44dd-bb32-6d96a7a895a9}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\Structures">
+      <UniqueIdentifier>{54962bfb-16b4-45f1-80bd-0c1a6a9d7ad6}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <Text Include="ReadMe.txt" />
@@ -32,6 +35,9 @@
   <ItemGroup>
     <ClCompile Include="Algorithms.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="SegmentTree.cpp">
+      <Filter>Source Files\Structures</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

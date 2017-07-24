@@ -35,3 +35,9 @@
 *.suo
 *.VC.db
 *.VC.opendb
+
+#folders
+/Algorithms/Debug
+/Algorithms/Release
+/Algorithms/Algorithms/Debug
+/Algorithms/Algorithms/Release
