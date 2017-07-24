@@ -4,15 +4,6 @@
 
 namespace segment_tree
 {
-	template<typename TValue>
-	struct ConstArray
-	{
-		typedef TValue value_type;
-		value_type val;
-		ConstArray(const value_type& val) : val(val) {}
-		const value_type& operator[](int) const { return val; }
-	};
-
 	struct Pos
 	{
 		int i;
@@ -119,7 +110,7 @@ namespace segment_tree
 	template<typename TOperation, typename TNode>
 	typename TOperation::result_type calc(TOperation& op, Iter<TNode> it, const Query& q)
 	{
-		if (!q.has_common(it)) return op.default_res();
+		if (!q.has_common(it)) return op.get();
 
 		op.push(it);
 		if (q.includes(it))
@@ -166,7 +157,7 @@ class AddSumST
 
 	typedef segment_tree::Iter<Node> iter;
 	segment_tree::Tree<Node> _tree;
-	iter root() const { return iter(_tree); }
+	iter root() const { return _tree; }
 	
 	struct calc_op
 	{
@@ -215,7 +206,7 @@ class AddSumST
 	struct sum_op : public calc_op
 	{
 		typedef T result_type;
-		T default_res() { return 0; }
+		T get() { return 0; }
 		T get(const iter& it) { return it->sum; }
 		T merge(T left, T right) { return left + right; }
 	};
@@ -258,7 +249,7 @@ class AddSetSumST
 
 	typedef segment_tree::Iter<Node> iter;
 	segment_tree::Tree<Node> _tree;
-	iter root() const { return iter(_tree); }
+	iter root() const { return _tree; }
 
 	struct calc_op
 	{
@@ -334,7 +325,7 @@ class AddSetSumST
 	struct sum_op : public calc_op
 	{
 		typedef T result_type;
-		T default_res() { return 0; }
+		T get() { return 0; }
 		T get(const iter& it) { return it->sum; }
 		T merge(T left, T right) { return left + right; }
 	};
@@ -387,9 +378,8 @@ class AddMinST
 
 	typedef segment_tree::Iter<Node> iter;
 	segment_tree::Tree<Node> _tree;
-	iter root() const { return iter(_tree); }
-
-
+	iter root() const { return _tree; }
+	
 	struct calc_op
 	{
 		void push(const iter& it)
@@ -449,7 +439,7 @@ class AddMinST
 	{
 		typedef pair<T, int> result_type;
 
-		result_type default_res()
+		result_type get()
 		{
 			return result_type(INF, -1); 
 		}
