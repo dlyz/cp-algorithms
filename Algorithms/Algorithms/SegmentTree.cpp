@@ -7,7 +7,6 @@ void TestSegmentTree1()
 	vint v{ 1, 2, 3 };
 	st.assign(v);
 	st.assign(100);
-	st.assign(100, 2);
 
 	st.add(1, 50, 100);
 	st.set(10, 70, 50);

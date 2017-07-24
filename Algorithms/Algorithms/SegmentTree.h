@@ -51,7 +51,29 @@ namespace segment_tree
 	};
 
 	template<typename TNode>
-	class Tree;
+	class Tree
+	{
+	public:
+		typedef TNode node_type;
+
+	private:
+		mutable vector<node_type> _t;
+		int _size;
+
+	public:
+		int size() const { return _size; }
+		node_type& node(int i) const { return _t[i]; }
+
+		void assign(int size)
+		{
+			_size = size;
+			int tsize = 1;
+			while (tsize < size) tsize <<= 1;
+			tsize <<= 1;
+			_t.assign(tsize, node_type());
+		}
+	};
+
 
 	template<typename TNode>
 	struct Iter : public Pos
@@ -80,24 +102,24 @@ namespace segment_tree
 		op.apply(it.right());
 	}
 	
-	template<typename TOperation, typename TNode, typename TContainer>
-	void build(TOperation& op, Iter<TNode> it, const TContainer& container)
+	template<typename TOperation, typename TNode>
+	void build(TOperation& op, Iter<TNode> it)
 	{
 		if (it.is_leaf())
 		{
-			op.init(it, container[it.l]);
+			op.init(it);
 			return;
 		}
 
-		build(op, it.left(), container);
-		build(op, it.right(), container);
+		build(op, it.left());
+		build(op, it.right());
 		op.recalc(it);
 	}
 
 	template<typename TOperation, typename TNode>
 	typename TOperation::result_type calc(TOperation& op, Iter<TNode> it, const Query& q)
 	{
-		if (!q.has_common(it)) return op.def();
+		if (!q.has_common(it)) return op.default_res();
 
 		op.push(it);
 		if (q.includes(it))
@@ -128,56 +150,6 @@ namespace segment_tree
 		op.recalc(it);
 	}
 
-	template<typename TNode>
-	class Tree
-	{
-	public:
-		typedef TNode node_type;
-		typedef Iter<TNode> iterator;
-
-	private:
-		mutable vector<node_type> _t;
-		int _size;
-
-	public:
-		int size() const { return _size; }
-		node_type& node(int i) const { return _t[i]; }
-
-		void assign(int size)
-		{
-			_size = size;
-			int tsize = 1;
-			while (tsize < size) tsize <<= 1;
-			tsize <<= 1;
-			_t.assign(tsize, node_type());
-		}
-
-		template<typename TOperation, typename TValue>
-		void assign(TOperation& operation, int size, const TValue& val)
-		{
-			assign(size);
-			build(operation, iterator(*this), ConstArray<TValue>(val));
-		}
-
-		template<typename TOperation, typename TValue>
-		void assign(TOperation& operation, const vector<TValue>& vals)
-		{
-			assign(vals.size());
-			build(operation, iterator(*this), vals);
-		}
-
-		template<typename TOperation>
-		typename TOperation::result_type calc(TOperation& op, const Query& q) const
-		{
-			return segment_tree::calc(op, iterator(*this), q);
-		}
-
-		template<typename TOperation>
-		void modify(TOperation& op, const Query& q)
-		{
-			return segment_tree::modify(op, iterator(*this), q);
-		}
-	};
 
 }
 
@@ -194,32 +166,42 @@ class AddSumST
 
 	typedef segment_tree::Iter<Node> iter;
 	segment_tree::Tree<Node> _tree;
+	iter root() const { return iter(_tree); }
 	
-	struct base_op
+	struct calc_op
 	{
-		void init(const iter& it, const T& val)
-		{
-			it->sum = val;
-		}
-
-		void recalc(const iter& it)
-		{
-			it->sum = it.left()->sum + it.right()->sum;
-		}
-
 		void push(const iter& it)
 		{
 			Node& node = *it;
 			if (node.add != 0)
 			{
-				node.sum += node.add * it.len();
 				segment_tree::apply_to_children(add_op(node.add), it);
+				node.sum += node.add * it.len();
 				node.add = 0;
 			}
 		}
 	};
 
-	struct add_op : public base_op
+	struct mod_op : public calc_op
+	{
+		void recalc(const iter& it)
+		{
+			it->sum = it.left()->sum + it.right()->sum;
+		}
+	};
+
+	struct init_vec_op : public mod_op
+	{
+		const vector<T>& v;
+		init_vec_op(const vector<T>& v) : v(v) {}
+
+		void init(const iter& it)
+		{
+			it->sum = v[it.leaf_index()];
+		}
+	};
+
+	struct add_op : public mod_op
 	{
 		T val;
 		add_op(const T& val) : val(val) {}
@@ -230,39 +212,33 @@ class AddSumST
 		}
 	};
 	
-	struct sum_op : public base_op
+	struct sum_op : public calc_op
 	{
 		typedef T result_type;
-		T merge(T left, T right)
-		{
-			return left + right;
-		}
-		T get(const iter& it)
-		{
-			return it->sum;
-		}
-		T def() const { return 0; }
+		T default_res() { return 0; }
+		T get(const iter& it) { return it->sum; }
+		T merge(T left, T right) { return left + right; }
 	};
 
 public:
-	void assign(int size, const T& val = 0)
+	void assign(int size)
 	{
-		if (val == 0) _tree.assign(size);
-		else _tree.assign(base_op(), size, val);
+		_tree.assign(size);
 	}
 	void assign(const vector<T>& vals)
 	{
-		_tree.assign(base_op(), vals);
+		assign(vals.size());
+		segment_tree::build(init_vec_op(vals), root());
 	}
 
 	T sum(int l, int r) const
 	{
-		return _tree.calc(sum_op(), segment_tree::Query(l, r));
+		return segment_tree::calc(sum_op(), root(), segment_tree::Query(l, r));
 	}
 
 	void add(int l, int r, T val)
 	{
-		return _tree.modify(add_op(val), segment_tree::Query(l, r));
+		return segment_tree::modify(add_op(val), root(), segment_tree::Query(l, r));
 	}
 
 };
@@ -282,39 +258,48 @@ class AddSetSumST
 
 	typedef segment_tree::Iter<Node> iter;
 	segment_tree::Tree<Node> _tree;
+	iter root() const { return iter(_tree); }
 
-	
-	struct base_op
+	struct calc_op
 	{
-		void init(const iter& it, const T& val)
-		{
-			it->sum = val;
-		}
-
-		void recalc(const iter& it)
-		{
-			it->sum = it.left()->sum + it.right()->sum;
-		}
-
 		void push(const iter& it)
 		{
 			Node& node = *it;
 			if (node.set != UNDEF)
 			{
-				node.sum = node.set * it.len();
 				segment_tree::apply_to_children(set_op(node.set), it);
+				node.sum = node.set * it.len();
 				node.set = UNDEF;
 			}
 			else if (node.add != 0)
 			{
-				node.sum += node.add * it.len();
 				segment_tree::apply_to_children(add_op(node.add), it);
+				node.sum += node.add * it.len();
 				node.add = 0;
 			}
 		}
 	};
+
+	struct mod_op : public calc_op
+	{
+		void recalc(const iter& it)
+		{
+			it->sum = it.left()->sum + it.right()->sum;
+		}
+	};
+
+	struct init_vec_op : public mod_op
+	{
+		const vector<T>& v;
+		init_vec_op(const vector<T>& v) : v(v) {}
+
+		void init(const iter& it)
+		{
+			it->sum = v[it.leaf_index()];
+		}
+	};
 	
-	struct add_op : public base_op
+	struct add_op : public mod_op
 	{
 		T val;
 		add_op(const T& val) : val(val) {}
@@ -333,7 +318,7 @@ class AddSetSumST
 		}
 	};
 
-	struct set_op : public base_op
+	struct set_op : public mod_op
 	{
 		T val;
 		set_op(const T& val) : val(val) {}
@@ -346,44 +331,38 @@ class AddSetSumST
 		}
 	};
 
-	struct sum_op : public base_op
+	struct sum_op : public calc_op
 	{
 		typedef T result_type;
-		T def() const { return 0; }
-		T get(const iter& it)
-		{
-			return it->sum;
-		}
-		T merge(T left, T right)
-		{
-			return left + right;
-		}
+		T default_res() { return 0; }
+		T get(const iter& it) { return it->sum; }
+		T merge(T left, T right) { return left + right; }
 	};
 
 public:
-	void assign(int size, const T& val = 0)
+	void assign(int size)
 	{
-		if (val == 0) _tree.assign(size);
-		else _tree.assign(base_op(), size, val);
+		_tree.assign(size);
 	}
 	void assign(const vector<T>& vals)
 	{
-		_tree.assign(base_op(), vals);
+		assign(vals.size());
+		segment_tree::build(init_vec_op(vals), root());
 	}
 
 	T sum(int l, int r) const
 	{
-		return _tree.calc(sum_op(), segment_tree::Query(l, r));
+		return segment_tree::calc(sum_op(), root(), segment_tree::Query(l, r));
 	}
 
 	void add(int l, int r, T val)
 	{
-		return _tree.modify(add_op(val), segment_tree::Query(l, r));
+		return segment_tree::modify(add_op(val), root(), segment_tree::Query(l, r));
 	}
 
 	void set(int l, int r, T val)
 	{
-		return _tree.modify(set_op(val), segment_tree::Query(l, r));
+		return segment_tree::modify(set_op(val), root(), segment_tree::Query(l, r));
 	}
 
 };
@@ -404,46 +383,58 @@ class AddMinST
 			minp.second = index;
 			add = 0;
 		}
-
-		void recalc(const Node& l, const Node& r)
-		{
-			minp = std::min(l.minp, r.minp);
-		}
-
-		void apply()
-		{
-			minp.first += add;
-			add = 0;
-		}
 	};
 
 	typedef segment_tree::Iter<Node> iter;
 	segment_tree::Tree<Node> _tree;
+	iter root() const { return iter(_tree); }
 
-	struct base_op
+
+	struct calc_op
 	{
-		void init(const iter& it, const T& val)
-		{
-			it->init(val, it.leaf_index());
-		}
-
-		void recalc(const iter& it)
-		{
-			it->recalc(*it.left(), *it.right());
-		}
-
 		void push(const iter& it)
 		{
 			Node& node = *it;
 			if (node.add != 0)
 			{
 				segment_tree::apply_to_children(add_op(node.add), it);
-				node.apply();
+				node.minp.first += node.add;
+				node.add = 0;
 			}
 		}
 	};
 
-	struct add_op : public base_op
+	struct mod_op : public calc_op
+	{
+		void recalc(const iter& it)
+		{
+			it->minp = std::min(it.left()->minp, it.right()->minp);
+		}
+	};
+
+	struct init_vec_op : public mod_op
+	{
+		const vector<T>& v;
+		init_vec_op(const vector<T>& v) : v(v) {}
+
+		void init(const iter& it)
+		{
+			it->init(v[it.leaf_index()], it.leaf_index());
+		}
+	};
+
+	struct init_const_op : public mod_op
+	{
+		T val;
+		init_const_op(const T& val) : val(val) {}
+
+		void init(const iter& it)
+		{
+			it->init(val, it.leaf_index());
+		}
+	};
+
+	struct add_op : public mod_op
 	{
 		T val;
 		add_op(const T& val) : val(val) {}
@@ -454,38 +445,44 @@ class AddMinST
 		}
 	};
 
-	struct min_op : public base_op
+	struct min_op : public calc_op
 	{
 		typedef pair<T, int> result_type;
-		result_type merge(result_type left, result_type right)
+
+		result_type default_res()
 		{
-			return std::min(left, right);
+			return result_type(INF, -1); 
 		}
 		result_type get(const iter& it)
 		{
 			return it->minp;
 		}
-		result_type def() const { return result_type(INF, -1); }
+		result_type merge(result_type left, result_type right)
+		{
+			return std::min(left, right);
+		}
 	};
 
 public:
 	void assign(int size, const T& val = 0)
 	{
-		_tree.assign(base_op(), size, val);
+		_tree.assign(size);
+		segment_tree::build(init_const_op(val), root());
 	}
 	void assign(const vector<T>& vals)
 	{
-		_tree.assign(base_op(), vals);
+		_tree.assign(vals.size());
+		segment_tree::build(init_vec_op(vals), root());
 	}
 
 	pair<T, int> min(int l, int r) const
 	{
-		return _tree.calc(min_op(), segment_tree::Query(l, r));
+		return segment_tree::calc(min_op(), root(), segment_tree::Query(l, r));
 	}
 
 	void add(int l, int r, T val)
 	{
-		return _tree.modify(add_op(val), segment_tree::Query(l, r));
+		return segment_tree::modify(add_op(val), root(), segment_tree::Query(l, r));
 	}
 
 };
