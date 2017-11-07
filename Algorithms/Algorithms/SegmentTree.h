@@ -1,7 +1,6 @@
 #pragma once
 #include "header.h"
 
-
 namespace segment_tree
 {
 	struct Pos
@@ -30,30 +29,23 @@ namespace segment_tree
 		Query() {}
 		Query(int l, int r) : l(l), r(r) {}
 
-		bool has_common(const Pos& p) const
-		{
-			return !(r < p.l || l > p.r);
-		}
-		bool includes(const Pos& p) const
-		{
-			return l == p.l && r == p.r;
-		}
-
+		bool has_common(const Pos& p) const { return !(r < p.l || l > p.r); }
+		bool includes(const Pos& p) const { return l <= p.l && r >= p.r; }
 	};
 
 	template<typename TNode>
 	class Tree
 	{
 	public:
-		typedef TNode node_type;
+		using node_type = TNode;
 
 	private:
-		mutable vector<node_type> _t;
+		vector<node_type> _t;
 		int _size;
 
 	public:
 		int size() const { return _size; }
-		node_type& node(int i) const { return _t[i]; }
+		node_type& node(int i) { return _t[i]; }
 
 		void assign(int size)
 		{
@@ -69,32 +61,34 @@ namespace segment_tree
 	template<typename TNode>
 	struct Iter : public Pos
 	{
-		typedef TNode node_type;
-		typedef Tree<node_type> tree_type;
+		using node_type = TNode;
+		using tree_type = Tree<node_type>;
 
-		const tree_type& tree;
+		tree_type& tree;
 
-		Iter(const tree_type& tree) : Pos(1, 0, tree.size() - 1), tree(tree) {}
-		Iter(const tree_type& tree, const Pos& p) : Pos(p), tree(tree) {}
-		
+		Iter(tree_type& tree) : Pos(1, 0, tree.size() - 1), tree(tree) {}
+		Iter(tree_type& tree, const Pos& p) : Pos(p), tree(tree) {}
+
 		Iter left() const { return Iter(tree, pleft()); }
 		Iter right() const { return Iter(tree, pright()); }
 
 		node_type& operator*() const { return tree.node(i); }
 		node_type* operator->() const { return &tree.node(i); }
 	};
-	
+
+	// op.modify(it)
 	template<typename TOperation, typename TNode>
-	void apply_to_children(TOperation& op, const Iter<TNode>& it)
+	void modify_children(TOperation& op, const Iter<TNode>& it)
 	{
 		if (it.is_leaf()) return;
 
-		op.apply(it.left());
-		op.apply(it.right());
+		op.modify(it.left());
+		op.modify(it.right());
 	}
-	
+
+	// op.init(it), op.recalc(it)
 	template<typename TOperation, typename TNode>
-	void build(TOperation& op, Iter<TNode> it)
+	void build(TOperation& op, const Iter<TNode>& it)
 	{
 		if (it.is_leaf())
 		{
@@ -107,10 +101,11 @@ namespace segment_tree
 		op.recalc(it);
 	}
 
+	// op.push(it), op.zero(), op.get(it), op.merge(r1, r2) 
 	template<typename TOperation, typename TNode>
-	typename TOperation::result_type calc(TOperation& op, Iter<TNode> it, const Query& q)
+	typename TOperation::result_type calc(TOperation& op, const Iter<TNode>& it, const Query& q)
 	{
-		if (!q.has_common(it)) return op.get();
+		if (!q.has_common(it)) return op.zero();
 
 		op.push(it);
 		if (q.includes(it))
@@ -124,25 +119,99 @@ namespace segment_tree
 		);
 	}
 
+	// op.push(it), op.modify(it), op.recalc(it)
 	template<typename TOperation, typename TNode>
-	void modify(TOperation& op, Iter<TNode> it, const Query& q)
+	void modify(TOperation& op, const Iter<TNode>& it, const Query& q)
 	{
-		if (!q.has_common(it)) return;
 		if (q.includes(it))
 		{
-			op.apply(it);
+			op.modify(it);
 			op.push(it);
 			return;
 		}
 
 		op.push(it);
+		if (!q.has_common(it)) return;
+
 		modify(op, it.left(), q);
 		modify(op, it.right(), q);
 		op.recalc(it);
 	}
-
-
 }
+
+template<typename T>
+class STTemplate
+{
+	struct Node
+	{
+		T value;
+	};
+
+	using iter = segment_tree::Iter<Node>;
+		
+	struct op_calc_base
+	{
+		void push(const iter& it) 
+		{
+			segment_tree::modify_children(op_modify(), it);
+			// apply delayed modification
+		}
+	};
+
+	struct op_modify_base
+	{
+		void recalc(const iter& it) 
+		{
+			it->value = it->left()->value + it->right()->value; 
+		}
+	};
+
+	struct op_build : public op_modify_base
+	{
+		// it is leaf
+		void init(const iter& it) { it->value = 0; }
+	};
+
+	struct op_modify : public op_modify_base
+	{
+		const T& mvalue;
+		op_modify(const T& mvalue) : mvalue(mvalue) {}
+
+		void modify(const iter& it) 
+		{
+			//save delayed modification in it 
+		}
+	};
+
+	struct op_calc : public op_calc_base
+	{
+		using result_type = T;
+		result_type zero() { return 0; }
+		result_type get(const iter& it) { return it->value; }
+		result_type merge(const result_type& lhs, const result_type& rhs) { return lhs + rhs; };
+	};
+
+	segment_tree::Tree<Node> _tree;
+	iter root() const { return _tree; }
+
+public:
+	void assign(int size)
+	{
+		_tree.assign(size)
+		segment_tree::build(op_build(), root());
+	}
+
+	T calc(int l, int r) const
+	{
+		return segment_tree::calc(op_calc(), root(), segment_tree::Query(l, r));
+	}
+
+	void modify(int l, int r, T val)
+	{
+		return segment_tree::modify(op_modify(val), root(), segment_tree::Query(l, r));
+	}
+};
+
 
 
 template<typename T>
@@ -155,7 +224,7 @@ class AddSumST
 		Node() : sum(0), add(0) {}
 	};
 
-	typedef segment_tree::Iter<Node> iter;
+	using iter = segment_tree::Iter<Node>;
 	segment_tree::Tree<Node> _tree;
 	iter root() const { return _tree; }
 	
@@ -197,7 +266,7 @@ class AddSumST
 		T val;
 		add_op(const T& val) : val(val) {}
 
-		void apply(const iter& it)
+		void modify(const iter& it)
 		{
 			it->add += val;
 		}
@@ -205,8 +274,8 @@ class AddSumST
 	
 	struct sum_op : public calc_op
 	{
-		typedef T result_type;
-		T get() { return 0; }
+		using result_type = T;
+		T zero() { return 0; }
 		T get(const iter& it) { return it->sum; }
 		T merge(T left, T right) { return left + right; }
 	};
@@ -247,8 +316,8 @@ class AddSetSumST
 		Node() : sum(0), add(0), set(UNDEF) {}
 	};
 
-	typedef segment_tree::Iter<Node> iter;
-	segment_tree::Tree<Node> _tree;
+	using iter = segment_tree::Iter<Node>;
+	mutable segment_tree::Tree<Node> _tree;
 	iter root() const { return _tree; }
 
 	struct calc_op
@@ -258,13 +327,13 @@ class AddSetSumST
 			Node& node = *it;
 			if (node.set != UNDEF)
 			{
-				segment_tree::apply_to_children(set_op(node.set), it);
+				segment_tree::modify_children(set_op(node.set), it);
 				node.sum = node.set * it.len();
 				node.set = UNDEF;
 			}
 			else if (node.add != 0)
 			{
-				segment_tree::apply_to_children(add_op(node.add), it);
+				segment_tree::modify_children(add_op(node.add), it);
 				node.sum += node.add * it.len();
 				node.add = 0;
 			}
@@ -295,7 +364,7 @@ class AddSetSumST
 		T val;
 		add_op(const T& val) : val(val) {}
 
-		void apply(const iter& it)
+		void modify(const iter& it)
 		{
 			Node& node = *it;
 			if (node.set != UNDEF)
@@ -314,7 +383,7 @@ class AddSetSumST
 		T val;
 		set_op(const T& val) : val(val) {}
 
-		void apply(const iter& it) const
+		void modify(const iter& it) const
 		{
 			Node& node = *it;
 			node.add = 0;
@@ -324,8 +393,8 @@ class AddSetSumST
 
 	struct sum_op : public calc_op
 	{
-		typedef T result_type;
-		T get() { return 0; }
+		using result_type = T;
+		T zero() { return 0; }
 		T get(const iter& it) { return it->sum; }
 		T merge(T left, T right) { return left + right; }
 	};
@@ -359,10 +428,9 @@ public:
 };
 
 
-template<typename T>
+template<typename T, T INF = T(1e9)>
 class AddMinST
 {
-	static const int INF = 1e9;
 	struct Node
 	{
 		pair<T, int> minp;
@@ -376,9 +444,9 @@ class AddMinST
 		}
 	};
 
-	typedef segment_tree::Iter<Node> iter;
-	segment_tree::Tree<Node> _tree;
-	iter root() const { return _tree; }
+	using iter = segment_tree::Iter<Node>;
+	mutable segment_tree::Tree<Node> _tree;
+	iter root() const { return _tree; }	
 	
 	struct calc_op
 	{
@@ -387,7 +455,7 @@ class AddMinST
 			Node& node = *it;
 			if (node.add != 0)
 			{
-				segment_tree::apply_to_children(add_op(node.add), it);
+				segment_tree::modify_children(add_op(node.add), it);
 				node.minp.first += node.add;
 				node.add = 0;
 			}
@@ -429,7 +497,7 @@ class AddMinST
 		T val;
 		add_op(const T& val) : val(val) {}
 
-		void apply(const iter& it)
+		void modify(const iter& it)
 		{
 			it->add += val;
 		}
@@ -437,9 +505,9 @@ class AddMinST
 
 	struct min_op : public calc_op
 	{
-		typedef pair<T, int> result_type;
+		using result_type = pair<T, int>;
 
-		result_type get()
+		result_type zero()
 		{
 			return result_type(INF, -1); 
 		}

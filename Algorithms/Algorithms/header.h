@@ -22,8 +22,9 @@
 #include <functional>
 #include <numeric>
 
-//#include <unordered_set>
-//#include <unordered_map>
+#include <unordered_set>
+#include <unordered_map>
+#include <random>
  
 using namespace std;
  
@@ -33,12 +34,9 @@ typedef double float64;
  
 template<typename T> T sqr(T x) { return x*x; }
 inline uint64 bit(int num) { return 1ull << num; }
-#define mp make_pair
 #define forn(i, n) for(int i = 0; i < int(n); ++i)
 #define forr(i, n) for(int i = int(n) - 1; i >= 0; --i)
-#define forit(i,c) for(i=(c).begin(); i!=(c).end(); ++i)
 #define all(x) (x).begin(), (x).end()
-#define zero(a) memset((a), 0, sizeof(a))
 
 typedef vector<int> vint;
 typedef vector<bool> vbool;
@@ -50,7 +48,7 @@ typedef pair<int64, int64> pii64;
 
 
 #ifdef ONLINE_JUDGE	
-	const string _file = "art";
+	const string _file = "name";
 	freopen((_file+".in").c_str(), "r", stdin);
 	freopen((_file+".out").c_str(), "w", stdout);
 #else
